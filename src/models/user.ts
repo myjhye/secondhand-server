@@ -1,0 +1,61 @@
+import { Document, Schema, model } from "mongoose";
+import { hash, compare, genSalt } from "bcrypt";
+
+
+// 1. 타입 정의
+interface UserDocument extends Document {
+  name: string;
+  email: string;
+  password: string;
+}
+
+interface Methods {
+  comparePassword(password: string): Promise<boolean>;
+}
+
+
+// 2. 스키마 정의
+const userSchema = new Schema<UserDocument, {}, Methods>(
+  {
+    email: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+    password: {
+      type: String,
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+  },
+  { 
+    timestamps: true 
+  }
+);
+
+
+
+// 3. 비밀번호 해싱
+userSchema.pre("save", async function (next) {
+  if (this.isModified("password")) {  // 비밀번호가 변경된 경우만 실행
+    const salt = await genSalt(10);
+    this.password = await hash(this.password, salt); // 비밀번호 해싱 후 저장
+  }
+
+  next(); // 다음 단계로 이동
+});
+
+
+// 4. 비밀번호 검증 메소드 (로그인 시 사용자가 입력한 비밀번호와 저장된 해시된 비밀번호 비교)
+userSchema.methods.comparePassword = async function (password) {
+  return await compare(password, this.password); // true(일치) / false(불일치) 반환
+};
+
+
+
+// 5. 생성한 모델 내보내기 (다른 파일에서 사용 가능하게)
+const UserModel = model("User", userSchema);
+export default UserModel;
