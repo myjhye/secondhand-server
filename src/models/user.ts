@@ -15,7 +15,7 @@ interface Methods {
 
 
 // 2. 스키마 정의
-const userSchema = new Schema<UserDocument, {}, Methods>(
+const userSchema = new Schema<UserDocument, {}, Methods>( // Schema<문서타입, 정적메소드타입(없음 -> {}), 인스턴스메소드타입>
   {
     email: {
       type: String,
@@ -32,7 +32,7 @@ const userSchema = new Schema<UserDocument, {}, Methods>(
     },
   },
   { 
-    timestamps: true 
+    timestamps: true // 자동으로 createdAt과 updatedAt 필드 추가
   }
 );
 
