@@ -2,7 +2,8 @@ import { RequestHandler } from "express";
 import UserModel from "src/models/user";
 import crypto from "crypto";
 import AuthVerificationTokenModel from "src/models/authVeirficationToken";
-import nodemailer from "nodemailer";
+import mail from "src/utils/mail";
+import { sendErrorRes } from "src/utils/helper";
 
 export const createNewUser: RequestHandler = async (req, res): Promise<void> => {
 
@@ -11,18 +12,9 @@ export const createNewUser: RequestHandler = async (req, res): Promise<void> => 
 
 
   // 2. 입력 데이터 유효성 검사
-  if (!name) {
-    res.status(422).json({ message: "Name is missing!" });
-    return; 
-  }
-  if (!email) {
-    res.status(422).json({ message: "Email is missing!" });
-    return;
-  }
-  if (!password) {
-    res.status(422).json({ message: "Password is missing!" });
-    return;
-  }
+  if (!name) return sendErrorRes(res, "Name is missing!", 422);
+  if (!email) return sendErrorRes(res, "Email is missing!", 422);
+  if (!password) return sendErrorRes(res, "Password is missing!", 422);
 
 
   // 3. 이메일 중복 확인
@@ -49,26 +41,38 @@ export const createNewUser: RequestHandler = async (req, res): Promise<void> => 
   const link = `http://localhost:8000/verify?id=${user._id}&token=${token}`;
 
 
-  // 7. 이메일 전송을 위한 전송자(transport) 설정
-  const transport = nodemailer.createTransport({
-    host: "sandbox.smtp.mailtrap.io",
-    port: 2525,
-    auth: {
-      user: "c5cf93b6836166",
-      pass: "081dde13a955c9",
-    },
-  });
-
-
-  // 8. 인증 이메일 전송
-  await transport.sendMail({
-    from: "verification@myapp.com",
-    to: user.email,
-    html: `<h1>Please click on <a href="${link}">this link</a> to verify your account.</h1>`,
-  });
+  // 7. 계정 인증 이메일 발송
+  await mail.sendVerification(user.email, link);
 
 
   // 9. 클라이언트에 성공 응답 전송
   res.json({ message: "Please check your inbox." });
   
 };
+
+
+
+
+export const verifyEmail: RequestHandler = async (req, res) => {
+
+  //  1. 요청 본문에서 사용자 ID와 토큰 추출
+  const { id, token } = req.body;
+
+  // 2. 데이터베이스에서 사용자의 인증 토큰 찾기
+  const authToken = await AuthVerificationTokenModel.findOne({ owner: id }); // owner 필드의 값이 id와 일치하는 문서 찾기
+  if (!authToken) return sendErrorRes(res, "unauthorized request!", 403);
+
+  // 3. 제공된 토큰과 저장된 토큰 비교
+  const isMatched = await authToken.compareToken(token);
+  if (!isMatched) return sendErrorRes(res, "unauthorized request, invalid token!", 403);
+
+  // 4. 사용자 계정을 인증됨으로 업데이트
+  await UserModel.findByIdAndUpdate(id, { verified: true });
+
+  // 5. 사용된 인증 토큰 데이터베이스에서 삭제 (토큰 재사용 공격 방지)
+  await AuthVerificationTokenModel.findByIdAndDelete(authToken._id);
+
+  // 6. 성공 메시지 반환
+  res.json({ message: "Thanks for joining us, your email is verified." });
+
+}

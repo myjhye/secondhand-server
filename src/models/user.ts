@@ -7,6 +7,8 @@ interface UserDocument extends Document {
   name: string;
   email: string;
   password: string;
+  verified: boolean;
+  tokens: string[];
 }
 
 interface Methods {
@@ -30,6 +32,11 @@ const userSchema = new Schema<UserDocument, {}, Methods>( // Schema<문서타입
       type: String,
       required: true,
     },
+    verified: {
+      type: Boolean,
+      default: false,
+    },
+    tokens: [String],
   },
   { 
     timestamps: true // 자동으로 createdAt과 updatedAt 필드 추가
