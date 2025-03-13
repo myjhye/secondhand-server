@@ -31,10 +31,7 @@ const tokenAndId = {
 export const newUserSchema = yup.object({
     name: yup.string().required("Name is missing"),
     email: yup.string().required("Email is missing").matches(emailRegex, "Invalid email format"),
-    password: yup.string()
-        .required("Password is missing")
-        .min(8, "Password should be at least 8 chars long!")
-        .matches(passwordRegex, "Password is too simple."),
+    ...password,
 });
 
 

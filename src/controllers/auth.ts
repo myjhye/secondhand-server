@@ -4,7 +4,17 @@ import crypto from "crypto";
 import AuthVerificationTokenModel from "src/models/authVeirficationToken";
 import mail from "src/utils/mail";
 import { sendErrorRes } from "src/utils/helper";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
 
+dotenv.config();
+
+const VERIFICATION_LINK = process.env.VERIFICATION_LINK;
+const JWT_SECRET = process.env.JWT_SECRET!;
+const PASSWORD_RESET_LINK = process.env.PASSWORD_RESET_LINK!;
+
+
+// 회원가입
 export const createNewUser: RequestHandler = async (req, res): Promise<void> => {
 
   // 1. 요청 본문에서 필요한 데이터 추출
@@ -53,6 +63,7 @@ export const createNewUser: RequestHandler = async (req, res): Promise<void> => 
 
 
 
+// 이메일 인증
 export const verifyEmail: RequestHandler = async (req, res) => {
 
   //  1. 요청 본문에서 사용자 ID와 토큰 추출
@@ -74,5 +85,56 @@ export const verifyEmail: RequestHandler = async (req, res) => {
 
   // 6. 성공 메시지 반환
   res.json({ message: "Thanks for joining us, your email is verified." });
+
+}
+
+
+// 로그인
+export const signIn: RequestHandler = async (req, res) => {
+ 
+  // 1. 이메일과 비밀번호를 입력 데이터로 받음
+  const { email, password } = req.body;
+
+  // 2. 제공된 이메일로 사용자 검색
+  const user = await UserModel.findOne({ email });
+  if (!user) return sendErrorRes(res, "Email/Password mismatch!", 403);
+
+  // 3. 비밀번호가 유효한지 확인 (암호화된 형태로 저장되어 있음)
+  const isMatched = await user.comparePassword(password);
+  if (!isMatched) return sendErrorRes(res, "Email/Password mismatch!", 403);
+
+  // 4. 유효하면 액세스 토큰과 리프레시 토큰 생성
+  const payload = { // JWT에 포함할 데이터(페이로드) -> 사용자 ID (사용자 식별에 사용)
+    id: user._id 
+  };
+
+  const accessToken = jwt.sign(payload, JWT_SECRET, {
+    expiresIn: "15m",
+  });
+  const refreshToken = jwt.sign(payload, JWT_SECRET);
+
+  // 5. 리프레시 토큰을 DB에 저장
+  if (!user.tokens) {
+    user.tokens = [refreshToken];
+  }
+  else {
+    user.tokens.push(refreshToken);
+  }
+
+  await user.save();
+
+  // 6. 두 토큰을 사용자에게 전송
+  res.json({
+    profile: {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      verified: user.verified,
+    },
+    tokens: { 
+      refresh: refreshToken, 
+      access: accessToken 
+    },
+  });
 
 }

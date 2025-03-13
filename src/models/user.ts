@@ -36,7 +36,7 @@ const userSchema = new Schema<UserDocument, {}, Methods>( // Schema<문서타입
       type: Boolean,
       default: false,
     },
-    tokens: [String],
+    tokens: [String], // 리프레시 토큰 배열 필드인 이유 -> 한 사용자가 여러 기기에서 동시에 로그인 (각 기기마다 다른 리프레시 토큰 저장)
   },
   { 
     timestamps: true // 자동으로 createdAt과 updatedAt 필드 추가
