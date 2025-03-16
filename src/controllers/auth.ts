@@ -138,3 +138,11 @@ export const signIn: RequestHandler = async (req, res) => {
   });
 
 }
+
+
+// 로그인한 사용자 프로필 정보 전송 (클라이언트 요청 받아)
+export const sendProfile : RequestHandler = async (req, res) => {
+  res.json({
+    profile: req.user, // 미들웨어로 검증된 로그인한 사용자 프로필 정보 (유효한 토큰 제공됨, 그 토큰이 사용자 데이터베이스에 존재)
+  })
+}
