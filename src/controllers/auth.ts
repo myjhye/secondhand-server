@@ -48,7 +48,8 @@ export const createNewUser: RequestHandler = async (req, res): Promise<void> => 
 
 
   // 6. 인증 링크 생성
-  const link = `http://localhost:8000/verify?id=${user._id}&token=${token}`;
+  const link = `http://localhost:8000/verify.html?id=${user._id}&token=${token}`;
+  //const link = `${VERIFICATION_LINK}?id=${user._id}&token=${token}`;
 
 
   // 7. 계정 인증 이메일 발송
