@@ -232,3 +232,32 @@ export const grantAccessToken: RequestHandler = async (req, res) => {
     },
   });
 }
+
+
+
+// 로그아웃 (리프레시 토큰 제거) -> 서버는 DB에 있는 리프레시 토큰만 제거(여기서 하는 일), 클라이언트는 액세스/리프레시 토큰 둘 다 제거
+export const signOut: RequestHandler = async (req, res) => {
+
+  // 1. 요청 본문에서 리프레시 토큰 추출
+  const { refreshToken } = req.body;
+
+  // 2. 요청에 포함된 사용자 ID와 리프레시 토큰으로 사용자 찾기
+  const user = await UserModel.findOne({
+    _id: req.user.id,
+    tokens: refreshToken,
+  });
+
+  // 3. 사용자를 찾지 못한 경우 오류 응답 반환
+  if (!user) return sendErrorRes(res, "Unauthorized request, user not found!", 403);
+
+  // 4. 사용자의 토큰 목록에서 해당 리프레시 토큰 제거
+  const newTokens = user.tokens.filter((t) => t !== refreshToken);
+  user.tokens = newTokens;
+
+  // 5. 변경된 사용자 정보 저장
+  await user.save();
+
+  // 6. 성공 응답 전송
+  res.send();
+
+}
