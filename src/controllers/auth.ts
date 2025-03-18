@@ -48,7 +48,7 @@ export const createNewUser: RequestHandler = async (req, res): Promise<void> => 
 
 
   // 6. 인증 링크 생성
-  const link = `http://localhost:8000/verify.html?id=${user._id}&token=${token}`;
+  const link = `${VERIFICATION_LINK}?id=${user._id}&token=${token}`;
   //const link = `${VERIFICATION_LINK}?id=${user._id}&token=${token}`;
 
 
@@ -106,7 +106,7 @@ export const generateVerificationLink: RequestHandler = async (req, res) => {
   const { id } = req.user;
   const token = crypto.randomBytes(36).toString("hex");
 
-  const link = `http://localhost:8000/verify.html?id=${id}&token=${token}`;
+  const link = `${VERIFICATION_LINK}?id=${id}&token=${token}`;
 
   await AuthVerificationTokenModel.findOneAndDelete({ owner: id });
 
