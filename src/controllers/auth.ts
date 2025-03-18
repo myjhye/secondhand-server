@@ -90,6 +90,41 @@ export const verifyEmail: RequestHandler = async (req, res) => {
 }
 
 
+
+
+export const generateVerificationLink: RequestHandler = async (req, res) => {
+
+  /**
+    1. 사용자 인증 여부 확인
+    2. 이전 토큰이 있으면 제거
+    3. 새 토큰 생성/저장
+    4. 사용자 이메일에 링크 전송
+    5. 응답 반환
+  **/
+
+
+  const { id } = req.user;
+  const token = crypto.randomBytes(36).toString("hex");
+
+  const link = `http://localhost:8000/verify.html?id=${id}&token=${token}`;
+
+  await AuthVerificationTokenModel.findOneAndDelete({ owner: id });
+
+  await AuthVerificationTokenModel.create({ 
+    owner: id, 
+    token 
+  });
+
+  await mail.sendVerification(req.user.email, link);
+
+  res.json({ message: "Please check your inbox." });
+
+}
+
+
+
+
+
 // 로그인
 export const signIn: RequestHandler = async (req, res) => {
  
@@ -146,4 +181,54 @@ export const sendProfile : RequestHandler = async (req, res) => {
   res.json({
     profile: req.user, // 미들웨어로 검증된 로그인한 사용자 프로필 정보 (유효한 토큰 제공됨, 그 토큰이 사용자 데이터베이스에 존재)
   })
+}
+
+
+
+
+// 리프레시 토큰으로 액세스 토큰 갱신
+export const grantAccessToken: RequestHandler = async (req, res) => {
+
+  // 1. 요청 본문에서 리프레시 토큰 읽기 및 검증
+  const { refreshToken } = req.body;
+  if (!refreshToken) return sendErrorRes(res, "Unauthorized request!", 403);
+
+  // 2. JWT 토큰 검증(refreshToken) 및 페이로드에서 사용자 ID 추출
+  const payload = jwt.verify(refreshToken, JWT_SECRET) as { id: string };
+  if (!payload.id) return sendErrorRes(res, "Unauthorized request!", 401);
+
+  // 3. 페이로드의 ID와 리프레시 토큰으로 사용자 찾기
+  const user = await UserModel.findOne({
+    _id: payload.id,
+    tokens: refreshToken,
+  });
+
+
+  // 4.  토큰은 유효하지만 사용자가 없는 경우, 토큰이 손상된 것으로 간주
+  // 모든 이전 토큰 제거 및 오류 응답 반환
+  if (!user) {
+    await UserModel.findByIdAndUpdate(payload.id, { tokens: [] });
+    return sendErrorRes(res, "Unauthorized request!", 401);
+  }
+
+
+  // 5. 유효한 토큰과 사용자가 있는 경우, 새 리프레시 및 액세스 토큰 생성 (사용자 ID를 포함한 토큰을 생성)
+  const newAccessToken = jwt.sign({ id: user._id }, JWT_SECRET, {
+    expiresIn: "15m",
+  });
+  const newRefreshToken = jwt.sign({ id: user._id }, JWT_SECRET);
+
+
+  // 6. 이전 토큰 제거, 사용자 업데이트 및 새 토큰 전송
+  const filteredTokens = user.tokens.filter((t) => t !== refreshToken);
+  user.tokens = filteredTokens;
+  user.tokens.push(newRefreshToken);
+  await user.save();
+
+  res.json({
+    tokens: { 
+      refresh: newRefreshToken, 
+      access: newAccessToken 
+    },
+  });
 }
