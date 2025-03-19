@@ -3,6 +3,7 @@ import jwt, { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 import UserModel from "src/models/user";
 import { sendErrorRes } from "src/utils/helper";
 import dotenv from "dotenv";
+import PasswordResetTokenModel from "src/models/passwordResetToken";
 
 dotenv.config();
 
@@ -62,4 +63,23 @@ export const isAuth: RequestHandler = async (req, res, next) => {
             return sendErrorRes(res, "Unauthorized Access!", 401);
         }
     }
+}
+
+
+// 비밀번호 재설정 토큰 유효성 검증
+export const isValidPassResetToken: RequestHandler = async (req, res, next) => {
+
+    // 1. 요청 본문에서 사용자 ID와 토큰 추출
+    const { id, token } = req.body;
+
+    // 2. 데이터베이스에서 해당 사용자 ID(owner)로 저장된 비밀번호 재설정 토큰 조회
+    const resetPassToken = await PasswordResetTokenModel.findOne({ owner: id });
+    if (!resetPassToken) return sendErrorRes(res, "Unauthorized request, invalid token!", 403);
+
+    // 3. 제공된 토큰과 저장된 토큰 비교 (해싱된 토큰끼리 비교)
+    const matched = await resetPassToken.compareToken(token);
+    if (!matched) return sendErrorRes(res, "Unauthorized request, invalid token!", 403);
+
+    // 4. 토큰 검증이 성공적으로 완료되면 다음 미들웨어로 제어 넘기기
+    next();
 }
