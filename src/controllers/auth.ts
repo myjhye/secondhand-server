@@ -6,6 +6,7 @@ import mail from "src/utils/mail";
 import { sendErrorRes } from "src/utils/helper";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import PasswordResetTokenModel from "src/models/passwordResetToken";
 
 dotenv.config();
 
@@ -261,3 +262,44 @@ export const signOut: RequestHandler = async (req, res) => {
   res.send();
 
 }
+
+
+
+// 사용자가 비밀번호를 잊어버렸을 때 이메일로 비밀번호 재설정 링크를 생성하고 전송
+export const generateForgetPassLink: RequestHandler = async (req, res) => {
+
+  // 1. 요청 본문에서 이메일 추출
+  const { email } = req.body;
+
+  // 2. 제공된 이메일로 사용자 검색
+  const user = await UserModel.findOne({ email });
+  if (!user) return sendErrorRes(res, "Account not found!", 404);
+
+  // 3. 이전에 발급된 비밀번호 재설정 토큰이 있다면 제거 (토큰 중복 방지)
+  await PasswordResetTokenModel.findOneAndDelete({ owner: user._id });
+
+  // 4. 새 비밀번호 재설정 토큰 생성
+  const token = crypto.randomBytes(36).toString("hex");
+  
+  // 5. 생성된 토큰을 데이터베이스에 저장
+  await PasswordResetTokenModel.create({ 
+    owner: user._id, // 사용자 ID 참조
+    token // 생성된 랜덤 토큰
+  });
+
+  // 6. 비밀번호 재설정 링크 생성
+  const passResetLink = `${PASSWORD_RESET_LINK}?id=${user._id}&token=${token}`;
+  
+  // 7. 생성된 링크를 사용자 이메일로 전송
+  await mail.sendPasswordResetLink(user.email, passResetLink);
+
+  // 8. 클라이언트에 성공 응답 전송
+  res.json({ message: "Please check your inbox for password reset instructions." });
+}
+
+
+
+
+export const grantValid: RequestHandler = async (req, res) => {
+  res.json({ valid: true });
+};
