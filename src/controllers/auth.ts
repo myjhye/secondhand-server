@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import PasswordResetTokenModel from "src/models/passwordResetToken";
 import { v2 as cloudinary } from "cloudinary";
+import { isValidObjectId } from "mongoose";
 
 dotenv.config({ path: '.env.local' });
 
@@ -447,4 +448,35 @@ export const updateAvatar: RequestHandler = async (req, res) => {
     console.error("Error in updateAvatar:", error);
     return sendErrorRes(res, "An error occurred while updating avatar", 500);
   }
+}
+
+
+
+
+// 사용자 공개 프로필 정보 조회
+export const sendPublicProfile: RequestHandler = async (req, res) => {
+
+  // 1. URL 파라미터에서 프로필 ID 추출
+  const profileId = req.params.id;
+
+  // 2. 프로필 ID의 유효성 검사 (MongoDB ObjectId 형식인지 확인)
+  if (!isValidObjectId(profileId)) {
+    return sendErrorRes(res, "Invalid profile id!", 422);
+  }
+
+  // 3. 제공된 ID로 사용자 검색
+  const user = await UserModel.findById(profileId);
+  if (!user) {
+    return sendErrorRes(res, "Profile not found!", 404);
+  }
+
+  // 4. 공개적으로 접근 가능한 제한된 프로필 정보만 응답으로 전송 (ID, 이름, 아바타 URL만 포함 - 이메일, 비밀번호 등 개인정보는 제외)
+  res.json({
+    profile: { 
+      id: user._id, 
+      name: user.name, 
+      avatar: user.avatar?.url 
+    },
+  });
+
 }
