@@ -333,3 +333,29 @@ export const updatePassword: RequestHandler = async (req, res) => {
   // 7. 클라이언트에 성공 응답 전송
   res.json({ message: "Password resets successfully." });
 }
+
+
+
+// 사용자 프로필 업데이트 (이름 변경)
+export const updateProfile: RequestHandler = async (req, res) => {
+
+  // 1. 요청 본문에서 이름 추출
+  const { name } = req.body;
+
+  // 2. 이름 유효성 검사 (문자열이며 최소 3자 이상이어야 함)
+  if (typeof name !== "string" || name.trim().length < 3) {
+    return sendErrorRes(res, "Invalid name!", 422);
+  }
+
+  // 3. 현재 로그인된 사용자의 ID로 데이터베이스에서 사용자를 찾아 이름 업데이트
+  await UserModel.findByIdAndUpdate(req.user.id, { name });
+
+  // 4. 업데이트된 프로필 정보와 함께 성공 응답 전송
+  res.json({ 
+    profile: { 
+      ...req.user, 
+      name 
+    } 
+  });
+
+}
