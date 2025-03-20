@@ -299,7 +299,37 @@ export const generateForgetPassLink: RequestHandler = async (req, res) => {
 
 
 
-
+// 비밀번호 재설정 토큰 검증 성공 시 클라이언트에 유효함 전송
 export const grantValid: RequestHandler = async (req, res) => {
   res.json({ valid: true });
 };
+
+
+
+// 비밀번호 재설정 요청 처리
+export const updatePassword: RequestHandler = async (req, res) => {
+
+  // 1. 요청 본문에서 사용자 ID와 새 비밀번호 추출
+  const { id, password } = req.body;
+
+  // 2. 제공된 ID로 사용자 검색
+  const user = await UserModel.findById(id);
+  if (!user) return sendErrorRes(res, "Unauthorized access!", 403);
+
+  // 3. 새 비밀번호가 기존 비밀번호와 같은지 확인 (보안 강화를 위해 다른 비밀번호로 변경하도록 함)
+  const matched = await user.comparePassword(password);
+  if (matched) return sendErrorRes(res, "The new password must be different!", 422);
+
+  // 4. 사용자 모델에 새 비밀번호 저장 (UserModel의 pre save 훅에 의해 비밀번호는 자동으로 해싱됨)
+  user.password = password;
+  await user.save();
+
+  // 5. 사용된 비밀번호 재설정 토큰 데이터베이스에서 삭제 (토큰 재사용 공격 방지)
+  await PasswordResetTokenModel.findOneAndDelete({ owner: user._id });
+
+  // 6. 비밀번호 변경 알림 이메일 발송
+  await mail.sendPasswordUpdateMessage(user.email);
+
+  // 7. 클라이언트에 성공 응답 전송
+  res.json({ message: "Password resets successfully." });
+}
