@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ path: '.env.local' });
 
 // 1. 이메일 발송을 위한 전송자(transporter) 설정 (Mailtrap은 실제 이메일을 보내지 않고 개발 환경에서 테스트하기 위한 서비스)
 const transport = nodemailer.createTransport({

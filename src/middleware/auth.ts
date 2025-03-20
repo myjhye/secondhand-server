@@ -5,7 +5,7 @@ import { sendErrorRes } from "src/utils/helper";
 import dotenv from "dotenv";
 import PasswordResetTokenModel from "src/models/passwordResetToken";
 
-dotenv.config();
+dotenv.config({ path: '.env.local' });
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 

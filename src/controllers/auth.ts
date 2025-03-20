@@ -7,12 +7,24 @@ import { sendErrorRes } from "src/utils/helper";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import PasswordResetTokenModel from "src/models/passwordResetToken";
+import { v2 as cloudinary } from "cloudinary";
 
-dotenv.config();
+dotenv.config({ path: '.env.local' });
 
 const VERIFICATION_LINK = process.env.VERIFICATION_LINK;
 const JWT_SECRET = process.env.JWT_SECRET!;
 const PASSWORD_RESET_LINK = process.env.PASSWORD_RESET_LINK!;
+const CLOUD_NAME = process.env.CLOUD_NAME!;
+const CLOUD_KEY = process.env.CLOUD_KEY!;
+const CLOUD_SECRET = process.env.CLOUD_SECRET!;
+
+
+cloudinary.config({
+  cloud_name: CLOUD_NAME,
+  api_key: CLOUD_KEY,
+  api_secret: CLOUD_SECRET,
+  secure: true,
+});
 
 
 // 회원가입
@@ -358,4 +370,81 @@ export const updateProfile: RequestHandler = async (req, res) => {
     } 
   });
 
+}
+
+
+
+// 사용자 프로필 이미지 업데이트
+export const updateAvatar: RequestHandler = async (req, res) => {
+  try {
+    // 1. 요청에 파일이 포함되어 있는지 확인
+    if (!req.files || !req.files.avatar) {
+      return sendErrorRes(res, "Avatar file is missing!", 422);
+    }
+
+    // 2. 요청에서 아바타 파일 추출
+    const { avatar } = req.files;
+    
+    // 3. 단일 파일인지 확인 (다중 파일 업로드 방지)
+    if (Array.isArray(avatar)) {
+      return sendErrorRes(res, "Multiple files are not allowed!", 422);
+    }
+
+    // 4. 파일이 이미지 형식인지 확인
+    if (!avatar.mimetype?.startsWith("image")) {
+      return sendErrorRes(res, "Invalid image file!", 422);
+    }
+
+    // 5. 현재 로그인한 사용자 ID로 사용자 검색
+    const user = await UserModel.findById(req.user.id);
+    if (!user) {
+      return sendErrorRes(res, "User not found!", 404);
+    }
+
+    // 6. Cloudinary에 이미지 업로드 처리
+    let uploadResult;
+    try {
+      // 6-1. 기존 아바타 이미지가 있으면 Cloudinary에서 삭제
+      if (user.avatar?.id) {
+        await cloudinary.uploader.destroy(user.avatar.id);
+      }
+      
+      // 6-2. 새 이미지 업로드 (얼굴 중심의 300x300 썸네일로 크롭)
+      uploadResult = await cloudinary.uploader.upload(
+        avatar.filepath,
+        {
+          width: 300,
+          height: 300,
+          crop: "thumb",
+          gravity: "face",
+        }
+      );
+    } 
+    catch (cloudinaryError) {
+      // 6-3. Cloudinary 업로드 실패 시 오류 처리
+      console.error("Cloudinary upload error:", cloudinaryError);
+      return sendErrorRes(res, "Failed to upload image to cloud storage", 500);
+    }
+    
+    // 7. 업로드 결과에서 이미지 URL(secure_url)과 ID(public_id) 추출
+    const { 
+      secure_url: url, 
+      public_id: id 
+    } = uploadResult;
+    
+    // 8. 사용자 모델에 새 아바타 정보 저장
+    user.avatar = { url, id };
+    await user.save();
+
+    // 9. 업데이트된 프로필 정보와 함께 성공 응답 전송
+    res.json({ 
+      profile: { 
+        ...req.user, 
+        avatar: user.avatar.url 
+      } 
+    });
+  } catch (error) {
+    console.error("Error in updateAvatar:", error);
+    return sendErrorRes(res, "An error occurred while updating avatar", 500);
+  }
 }
