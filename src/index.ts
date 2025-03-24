@@ -3,6 +3,7 @@ import authRouter from "./routes/auth";
 import "./db/index";
 import formidable from "formidable";
 import path from "path";
+import productRouter from "./routes/product";
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.urlencoded({ extended: false })); // URL-encoded 형식의 요�
 
 // 1. 
 app.use("/auth", authRouter);
+app.use("/product", productRouter);
 
 
 // 2. 파일 업로드

@@ -9,23 +9,14 @@ import dotenv from "dotenv";
 import PasswordResetTokenModel from "src/models/passwordResetToken";
 import { v2 as cloudinary } from "cloudinary";
 import { isValidObjectId } from "mongoose";
+import cloudUploader from "src/cloud";
 
 dotenv.config({ path: '.env.local' });
 
 const VERIFICATION_LINK = process.env.VERIFICATION_LINK;
 const JWT_SECRET = process.env.JWT_SECRET!;
 const PASSWORD_RESET_LINK = process.env.PASSWORD_RESET_LINK!;
-const CLOUD_NAME = process.env.CLOUD_NAME!;
-const CLOUD_KEY = process.env.CLOUD_KEY!;
-const CLOUD_SECRET = process.env.CLOUD_SECRET!;
 
-
-cloudinary.config({
-  cloud_name: CLOUD_NAME,
-  api_key: CLOUD_KEY,
-  api_secret: CLOUD_SECRET,
-  secure: true,
-});
 
 
 // 회원가입
@@ -407,11 +398,11 @@ export const updateAvatar: RequestHandler = async (req, res) => {
     try {
       // 6-1. 기존 아바타 이미지가 있으면 Cloudinary에서 삭제
       if (user.avatar?.id) {
-        await cloudinary.uploader.destroy(user.avatar.id);
+        await cloudUploader.destroy(user.avatar.id);
       }
       
       // 6-2. 새 이미지 업로드 (얼굴 중심의 300x300 썸네일로 크롭)
-      uploadResult = await cloudinary.uploader.upload(
+      uploadResult = await cloudUploader.upload(
         avatar.filepath,
         {
           width: 300,
