@@ -23,11 +23,11 @@ export const listNewProduct: RequestHandler = async (req, res) => {
     // 2. 상품 모델 생성
     const newProduct = new ProductModel({
         owner: req.user.id,
-               name,
-               price,
-               category,
-               description,
-               purchasingDate,
+        name,
+        price,
+        category,
+        description,
+        purchasingDate,
     });
 
     // 3. 요청에서 이미지 파일 추출
@@ -65,7 +65,7 @@ export const listNewProduct: RequestHandler = async (req, res) => {
         // 7-1. 다중 이미지 업로드
         const uploadPromise = images.map((file) => uploadImage(file.filepath));
         
-        // 7-2. 모든 파일 업로드 완료 대기
+        // 7-2. 모든 파일 업로드 완료 대기 (모든 이미지가 성공적으로 업로드되었는지 확인, 하나라도 실패 시 전체 트랜잭션 관리해야 함)
         const uploadResults = await Promise.all(uploadPromise);
 
         // 7-3. 업로드된 이미지 정보를 제품 모델에 저장
