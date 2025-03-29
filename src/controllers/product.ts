@@ -2,7 +2,7 @@ import { UploadApiResponse } from "cloudinary";
 import { RequestHandler } from "express";
 import ProductModel from "src/models/product";
 import { sendErrorRes } from "src/utils/helper";
-import cloudUploader from "src/cloud";
+import cloudUploader, { cloudApi } from "src/cloud";
 import { isValidObjectId } from "mongoose";
 
 
@@ -219,5 +219,36 @@ export const updateProduct: RequestHandler = async (req, res) => {
 
     // 12. 성공 응답 반환
     res.status(201).json({ message: "Product updated successfully." });
+
+}
+
+
+
+
+// 상품 삭제
+export const deleteProduct: RequestHandler = async (req, res) => {
+
+    // 1. URL 파라미터에서 상품 ID 추출 및 유효성 검사
+    const productId = req.params.id;
+    if (!isValidObjectId(productId)) return sendErrorRes(res, "Invalid product id!", 422);
+
+    // 2. 상품 찾기 및 삭제 (소유자 일치 확인)
+    const product = await ProductModel.findOneAndDelete({
+        _id: productId, // 요청된 상품 ID로 문서 검색
+        owner: req.user.id, // 현재 로그인한 사용자가 소유한 상품인지 확인
+    });
+
+    // 3. 상품이 존재하지 않거나 소유자가 일치하지 않는 경우 에러 반환
+    if (!product) return sendErrorRes(res, "Product not found!", 404);
+
+    // 4. 클라우드에서 연결된 이미지 파일 삭제
+    const images = product.images || [];
+    if (images.length) {
+        const ids = images.map(({ id }) => id); // 이미지 ID 배열 추출
+        await cloudApi.delete_resources(ids); // 클라우드에서 해당 이미지 리소스 삭제
+    }
+
+    // 5. 성공 응답 반환
+    res.json({ message: "Product removed successfully." });
 
 }
