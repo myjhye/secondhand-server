@@ -252,3 +252,53 @@ export const deleteProduct: RequestHandler = async (req, res) => {
     res.json({ message: "Product removed successfully." });
 
 }
+
+
+
+
+// 상품 이미지 삭제
+export const deleteProductImage: RequestHandler = async (req, res) => {
+
+    // 1. URL 파라미터에서 상품 ID와 이미지 ID 추출 및 유효성 검사
+    const { productId, imageId } = req.params;
+    if (!isValidObjectId(productId)) return sendErrorRes(res, "Invalid product id!", 422);
+
+    // 2. 상품 찾기 및 이미지 제거 (소유자 일치 확인)
+    const product = await ProductModel.findOneAndUpdate(
+        { 
+            _id: productId, 
+            owner: req.user.id 
+        },
+        {
+            $pull: { // MongoDB $pull 연산자를 사용하여 배열에서 특정 요소 제거
+                images: { // 'images' 배열에서
+                    id: imageId // 'id'가 요청된 imageId와 일치하는 객체 제거
+                },
+            },
+        },
+        { 
+            new: true 
+        }
+    );
+
+    // 3. 상품이 존재하지 않거나 소유자가 일치하지 않는 경우 에러 반환
+    if (!product) return sendErrorRes(res, "Product not found!", 404);
+
+    // 4. 삭제된 이미지가 썸네일인 경우 처리 (썸네일로 사용되던 이미지가 삭제되더라도 제품 정보의 일관성 유지)
+    if (product.thumbnail?.includes(imageId)) { // 현재 썸네일 URL에 삭제된 이미지 ID가 포함되어 있는지 확인
+        const images = product.images; // 남아있는 이미지 배열 가져오기
+        if (images) { // 다른 이미지가 있는지 확인
+            product.thumbnail = images[0].url; // 첫 번째 남은 이미지를 새 썸네일로 설정
+        }
+        else { // 남은 이미지가 없는 경우
+            product.thumbnail = ""; // 썸네일을 빈 문자열로 설정
+        }
+        await product.save(); // 변경된 썸네일 정보 저장
+    }
+
+    // 5. 클라우드에서 이미지 파일 삭제
+    await cloudUploader.destroy(imageId);
+
+    // 6. 성공 응답 반환
+    res.json({ message: "Image removed successfully." });
+}
