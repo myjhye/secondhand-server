@@ -3,6 +3,7 @@ import { RequestHandler } from "express";
 import ProductModel from "src/models/product";
 import { sendErrorRes } from "src/utils/helper";
 import cloudUploader from "src/cloud";
+import { isValidObjectId } from "mongoose";
 
 
 const uploadImage = (filePath: string): Promise<UploadApiResponse> => {
@@ -99,5 +100,124 @@ export const listNewProduct: RequestHandler = async (req, res) => {
 
     // 9. 성공 응답 반환
     res.status(201).json({ message: "Added new product!" });
+
+}
+
+
+
+
+// 상품 수정
+export const updateProduct: RequestHandler = async (req, res) => {
+
+    // 1. 요청 바디에서 제품 정보 추출
+    const { name, price, category, description, purchasingDate, thumbnail } = req.body;
+
+    // 2. URL 파라미터에서 상품 ID 추출 및 유효성 검사
+    const productId = req.params.id;
+    if (!isValidObjectId(productId)) return sendErrorRes(res, "Invalid product id!", 422);
+
+    // 3. 상품 찾기 및 업데이트 (소유자 일치 확인)
+    const product = await ProductModel.findOneAndUpdate(
+        { 
+            _id: productId, // 요청된 상품 ID로 문서 검색
+            owner: req.user.id // 현재 로그인한 사용자가 소유한 상품인지 확인
+        },
+        {
+            name, // 상품명 업데이트
+            price, // 가격 업데이트
+            category, // 카테고리 업데이트
+            description, // 설명 업데이트
+            purchasingDate, // 구매일자 업데이트
+        }, 
+        {
+            new: true, // true: 업데이트 후의 문서 반환, false: 업데이트 전 문서 반환
+        },
+    );
+
+    // 4. 상품이 존재하지 않거나 소유자가 일치하지 않는 경우 에러 반환
+    if (!product) return sendErrorRes(res, "Product not found!", 404);
+
+    // 5. 썸네일 업데이트 (문자열인 경우에만)
+    if (typeof thumbnail === "string") {
+        product.thumbnail = thumbnail
+    };
+
+    // 6. 요청에서 이미지 파일 추출
+    const { images } = req.files;
+    const isMultipleImages = Array.isArray(images);
+
+    // 7. 이미지 수량 제한 (최대 5개) 확인
+    if (isMultipleImages) {
+        const oldImages = product.images?.length || 0;
+        if (oldImages + images.length > 5) {
+            return sendErrorRes(res, "Image files can not be more than 5!", 422);
+        }
+    }
+
+    // 8. 이미지 타입 유효성 검사
+    let invalidFileType = false;
+
+    if (isMultipleImages) { // 8-1. 다중 이미지 경우
+        for (let img of images) {
+            if (!img.mimetype?.startsWith("image")) {
+            invalidFileType = true;
+            break;
+            }
+        }
+    } 
+    else { // 8-2. 단일 이미지 경우
+        if (images) {
+            if (!images.mimetype?.startsWith("image")) {
+                invalidFileType = true;
+            }
+        }
+    }
+
+    // 9. 유효하지 않은 파일 타입 에러 반환
+    if (invalidFileType) return sendErrorRes(res, "Invalid file type, files must be image type!", 422);
+    
+
+    // 10. 파일 업로드 처리
+    if (isMultipleImages) { // 10-1. 다중 이미지 업로드
+        const uploadPromise = images.map((file) => uploadImage(file.filepath));
+        const uploadResults = await Promise.all(uploadPromise);
+        const newImages = uploadResults.map(({ secure_url, public_id }) => {
+            return { 
+                url: secure_url, 
+                id: public_id 
+            };
+        });
+
+        // 10-2. 기존 이미지 배열에 새 이미지 추가
+        if (product.images) {
+            product.images.push(...newImages);
+        }
+        else {
+            product.images = newImages;
+        }
+    } 
+    else { // 10-3. 단일 이미지 업로드
+        if (images) {
+            const { secure_url, public_id } = await uploadImage(images.filepath);
+            if (product.images) {
+                product.images.push({ 
+                    url: secure_url, 
+                    id: public_id 
+                });
+            }
+            else {
+                product.images = [{ 
+                    url: secure_url, 
+                    id: public_id 
+                }];
+            }
+        }
+    }
+
+    // 11. 수정된 상품 정보 저장
+    await product.save();
+
+    // 12. 성공 응답 반환
+    res.status(201).json({ message: "Product updated successfully." });
 
 }
