@@ -343,7 +343,7 @@ export const getProductDetail: RequestHandler = async (req, res) => {
 
 
 
-// 카테고리 상품 조회
+// 특정 카테고리에 속한 상품 조회
 export const getProductsByCategory: RequestHandler = async (req, res) => {
 
     // 1. URL 파라미터에서 카테고리 추출 및 쿼리 파라미터에서 페이지 정보 추출
@@ -373,5 +373,30 @@ export const getProductsByCategory: RequestHandler = async (req, res) => {
     });
 
     // 4. 성공 응답 반환
+    res.json({ products: listings });
+}
+
+
+
+// 최신 상품 조회 (10개, 홈 화면 용도)
+export const getLatestProducts: RequestHandler = async (req, res) => {
+
+    // 1. 최신순으로 전체 상품 조회 (최대 10개)
+    const products = await ProductModel.find()
+                                       .sort("-createdAt") // 최신순 정렬 (내림차순)
+                                       .limit(10); // 10개로 제한
+
+    // 2. 클라이언트에 응답할 데이터 구조화
+    const listings = products.map((p) => {
+        return {
+            id: p._id,
+            name: p.name,
+            thumbnail: p.thumbnail,
+            category: p.category,
+            price: p.price,
+        };
+    });
+
+    // 3. 성공 응답 반환
     res.json({ products: listings });
 }
