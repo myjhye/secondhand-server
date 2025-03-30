@@ -400,3 +400,45 @@ export const getLatestProducts: RequestHandler = async (req, res) => {
     // 3. 성공 응답 반환
     res.json({ products: listings });
 }
+
+
+
+
+// 로그인한 사용자가 등록한 상품 목록 조회 (마이페이지 용도)
+export const getListings: RequestHandler = async (req, res) => {
+
+    // 1. 쿼리 파라미터에서 페이지 정보 추출
+    const { pageNo = "1", limit = "10" } = req.query as {
+        pageNo: string;
+        limit: string;
+    };
+
+    // 2. 현재 로그인한 사용자가 등록한 상품 검색 및 페이징 처리
+    const products = await ProductModel.find({ owner: req.user.id })
+                                       .sort("-createdAt") // 최신순 정렬 (내림차순)
+                                       .skip((+ pageNo - 1) * + limit) // 페이지 건너뛰기 (페이지네이션)
+                                       .limit(+ limit); // 한 페이지당 상품 수 제한
+
+
+    // 3. 클라이언트에 응답할 데이터 구조화 (상세 정보 포함)                                   
+    const listings = products.map((p) => {
+        return {
+            id: p._id,
+            name: p.name,
+            thumbnail: p.thumbnail,
+            category: p.category,
+            price: p.price,
+            image: p.images?.map((i) => i.url), // 모든 이미지 URL 배열
+            date: p.purchasingDate,
+            description: p.description,
+            seller: {
+                id: req.user.id,
+                name: req.user.name,
+                avatar: req.user.avatar,
+            },
+        };
+    });
+
+    // 4. 성공 응답 반환
+    res.json({ products: listings });
+}

@@ -14,6 +14,7 @@ interface UserProfile {
     name: string;
     email: string;
     verified: boolean;
+    avatar?: string;
 }
 
 // Express의 Request 타입 확장 -> user 속성 추가
