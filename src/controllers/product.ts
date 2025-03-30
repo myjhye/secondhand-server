@@ -5,6 +5,7 @@ import { sendErrorRes } from "src/utils/helper";
 import cloudUploader, { cloudApi } from "src/cloud";
 import { isValidObjectId } from "mongoose";
 import { UserDocument } from "src/models/user";
+import categories from "src/utils/categories";
 
 
 const uploadImage = (filePath: string): Promise<UploadApiResponse> => {
@@ -331,10 +332,46 @@ export const getProductDetail: RequestHandler = async (req, res) => {
             price: product.price,
             image: product.images?.map(({ url }) => url), // 이미지 URL 배열만 추출
             seller: { // populate를 통해 가져온 소유자 정보를 클라이언트용 데이터 형식으로 구성
-                id: product.owner._id,
-                name: product.owner.name,
-                avatar: product.owner.avatar?.url,
+                id: product.owner._id, // 소유자의 MongoDB ID
+                name: product.owner.name, // 소유자 이름
+                avatar: product.owner.avatar?.url, // 소유자 프로필 이미지 URL (없을 경우 undefined)
             },
         },
     });
+}
+
+
+
+
+// 카테고리 상품 조회
+export const getProductsByCategory: RequestHandler = async (req, res) => {
+
+    // 1. URL 파라미터에서 카테고리 추출 및 쿼리 파라미터에서 페이지 정보 추출
+    const { category } = req.params;
+    const { pageNo = "1", limit = "10" } = req.query as {
+        pageNo: string;
+        limit: string;
+    };
+
+    if (!categories.includes(category)) return sendErrorRes(res, "Invalid category!", 422);
+
+    // 2. 카테고리별 상품 검색 및 페이징 처리
+    const products = await ProductModel.find({ category })
+                                       .sort("-createdAt") // 최신순 정렬 (내림차순)
+                                       .skip((+ pageNo - 1) * + limit) // 페이지 건너뛰기 (페이지네이션) -> 현재 페이지 번호에 따라 이전 페이지의 모든 항목을 건너뛰고 현재 페이지에 해당하는 항목만 가져오기
+                                       .limit(+ limit); // 한 페이지당 상품 수 제한
+
+    // 3. 클라이언트에 응답할 데이터 구조화
+    const listings = products.map((p) => {
+        return {
+            id: p._id,
+            name: p.name,
+            thumbnail: p.thumbnail,
+            category: p.category,
+            price: p.price,
+        };
+    });
+
+    // 4. 성공 응답 반환
+    res.json({ products: listings });
 }
