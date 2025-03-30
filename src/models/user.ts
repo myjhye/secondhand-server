@@ -3,7 +3,7 @@ import { hash, compare, genSalt } from "bcrypt";
 
 
 // 1. 타입 정의
-interface UserDocument extends Document {
+export interface UserDocument extends Document {
   name: string;
   email: string;
   password: string;

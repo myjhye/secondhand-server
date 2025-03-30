@@ -4,6 +4,7 @@ import ProductModel from "src/models/product";
 import { sendErrorRes } from "src/utils/helper";
 import cloudUploader, { cloudApi } from "src/cloud";
 import { isValidObjectId } from "mongoose";
+import { UserDocument } from "src/models/user";
 
 
 const uploadImage = (filePath: string): Promise<UploadApiResponse> => {
@@ -301,4 +302,39 @@ export const deleteProductImage: RequestHandler = async (req, res) => {
 
     // 6. 성공 응답 반환
     res.json({ message: "Image removed successfully." });
+}
+
+
+
+
+
+// 단일 상품 정보 조회 (상세 페이지)
+export const getProductDetail: RequestHandler = async (req, res) => {
+
+    // 1. URL 파라미터에서 상품 ID 추출 및 유효성 검사
+    const { productId } = req.params;
+    if (!isValidObjectId(productId)) return sendErrorRes(res, "Invalid product id!", 422);
+
+    // 2. 상품 찾기 및 소유자 정보 조회 (populate) -> 상품 id로 상품 정보 조회하고, 해당 상품의 소유자(owner) 정보로 채우기 (JOIN 기능)
+    const product = await ProductModel.findById(productId).populate<{ owner: UserDocument; }>("owner");
+    if (!product) return sendErrorRes(res, "Product not found!", 404);
+
+    // 3. 클라이언트에 응답할 데이터 구조화
+    res.json({
+        product: {
+            id: product._id,
+            name: product.name,
+            description: product.description,
+            thumbnail: product.thumbnail,
+            category: product.category,
+            date: product.purchasingDate,
+            price: product.price,
+            image: product.images?.map(({ url }) => url), // 이미지 URL 배열만 추출
+            seller: { // populate를 통해 가져온 소유자 정보를 클라이언트용 데이터 형식으로 구성
+                id: product.owner._id,
+                name: product.owner.name,
+                avatar: product.owner.avatar?.url,
+            },
+        },
+    });
 }
