@@ -10,6 +10,7 @@ import { Server } from "socket.io";
 import "./db/index";
 import authRouter from "./routes/auth";
 import productRouter from "./routes/product";
+import { TokenExpiredError, verify } from "jsonwebtoken";
 
 // Express 앱 및 HTTP 서버 생성
 const app = express();
@@ -20,10 +21,38 @@ const io = new Server(server, {
   path: "/socket-message",
 });
 
+io.use((socket, next) => {
+  const socketReq = socket.handshake.auth as { token: string } | undefined;
+
+  console.log("[SERVER] ⛳ socket handshake auth:", socketReq);
+
+  if (!socketReq?.token) {
+    console.log("[SERVER] ❌ No token provided");
+    return next(new Error("Unauthorized request!"));
+  }
+
+  try {
+    const decoded = verify(socketReq.token, process.env.JWT_SECRET!);
+    socket.data.jwtDecode = decoded;
+
+    console.log("[SERVER] ✅ Token verified:", decoded);
+    next();
+  } 
+  catch (error: any) {
+    console.log("[SERVER] ❌ Token verification failed:", error.message);
+
+    if (error instanceof TokenExpiredError) {
+      return next(new Error("jwt expired"));
+    }
+
+    return next(new Error("Invalid token!"));
+  }
+});
+
 // 클라이언트 소켓 연결 이벤트
 io.on("connection", (socket) => {
-    console.log("user is connected");
-} )
+  console.log("[SERVER] 🚀 Socket connected:", socket.id);
+});
 
 // 미들웨어 등록
 app.use(cors()); 
