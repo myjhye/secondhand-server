@@ -1,4 +1,3 @@
-// 기본 모듈 및 라이브러리 import
 import express from "express";
 import cors from "cors";
 import formidable from "formidable";
@@ -6,12 +5,12 @@ import path from "path";
 import http from "http";
 import { Server } from "socket.io";
 
-// 내부 모듈 import
 import "./db/index";
 import authRouter from "./routes/auth";
 import productRouter from "./routes/product";
 import { TokenExpiredError, verify } from "jsonwebtoken";
 import morgan from "morgan";
+import conversationRouter from "./routes/conversation";
 
 // Express 앱 및 HTTP 서버 생성
 const app = express();
@@ -54,7 +53,7 @@ app.use(express.urlencoded({ extended: false }));
 // 라우터 등록
 app.use("/auth", authRouter);
 app.use("/product", productRouter);
-
+app.use("/conversation", conversationRouter);
 
 // 파일 업로드 API
 app.post("/upload-file", async (req, res) => {
