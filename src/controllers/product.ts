@@ -1,12 +1,16 @@
 import { UploadApiResponse } from "cloudinary";
 import { RequestHandler } from "express";
-import ProductModel from "src/models/product";
+import ProductModel, { ProductDocument } from "src/models/product";
 import { sendErrorRes } from "src/utils/helper";
 import cloudUploader, { cloudApi } from "src/cloud";
-import { isValidObjectId } from "mongoose";
+import { FilterQuery, isValidObjectId } from "mongoose";
 import { UserDocument } from "src/models/user";
 import categories from "src/utils/categories";
+import OpenAI from 'openai';
 
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
 const uploadImage = (filePath: string): Promise<UploadApiResponse> => {
     return cloudUploader.upload(filePath, {
@@ -17,7 +21,7 @@ const uploadImage = (filePath: string): Promise<UploadApiResponse> => {
 };
 
 
-// 새 상품 등록
+// 상품 등록
 export const listNewProduct: RequestHandler = async (req, res) => {
 
     // 1. 요청 바디에서 제품 정보 추출
@@ -227,7 +231,7 @@ export const updateProduct: RequestHandler = async (req, res) => {
 
 
 
-// 상품 삭제
+// 특정 상품 삭제
 export const deleteProduct: RequestHandler = async (req, res) => {
 
     // 1. URL 파라미터에서 상품 ID 추출 및 유효성 검사
@@ -309,7 +313,7 @@ export const deleteProductImage: RequestHandler = async (req, res) => {
 
 
 
-// 단일 상품 정보 조회 (상세 페이지)
+// 상품 상세 정보 조회
 export const getProductDetail: RequestHandler = async (req, res) => {
 
     // 1. URL 파라미터에서 상품 ID 추출 및 유효성 검사
@@ -343,7 +347,7 @@ export const getProductDetail: RequestHandler = async (req, res) => {
 
 
 
-// 특정 카테고리에 속한 상품 조회
+// 카테고리별 상품 목록 조회
 export const getProductsByCategory: RequestHandler = async (req, res) => {
 
     // 1. URL 파라미터에서 카테고리 추출 및 쿼리 파라미터에서 페이지 정보 추출
@@ -378,7 +382,7 @@ export const getProductsByCategory: RequestHandler = async (req, res) => {
 
 
 
-// 최신 상품 조회 (10개, 홈 화면 용도)
+// 최신 상품 10개 조회 (홈 용)
 export const getLatestProducts: RequestHandler = async (req, res) => {
 
     // 1. 최신순으로 전체 상품 조회 (최대 10개)
@@ -404,7 +408,7 @@ export const getLatestProducts: RequestHandler = async (req, res) => {
 
 
 
-// 로그인한 사용자가 등록한 상품 목록 조회 (마이페이지 용도)
+// 내 등록 상품 목록 조회 (마이페이지)
 export const getListings: RequestHandler = async (req, res) => {
 
     // 1. 쿼리 파라미터에서 페이지 정보 추출
@@ -441,4 +445,52 @@ export const getListings: RequestHandler = async (req, res) => {
 
     // 4. 성공 응답 반환
     res.json({ products: listings });
+}
+
+// 상품 검색
+export const searchProducts: RequestHandler = async (req, res) => {
+    const { name } = req.query;
+
+    const filter: FilterQuery<ProductDocument> = {}
+
+    if (typeof name === 'string') {
+        filter.name = { 
+            $regex: new RegExp(name, 'i') // 문자열 포함 검색 (대소문자 무시)
+        }; 
+    }
+
+    const products = await ProductModel.find(filter);
+
+    res.json({
+        results: products.map((product) => ({
+            id: product._id,
+            name: product.name,
+            thumbnail: product.thumbnail,
+        }))
+    })
+
+}
+
+// 상품 질문 (GPT 기반)
+export const askAiAboutProduct: RequestHandler = async (req, res) => {
+    const { title, price, description, question } = req.body;
+
+    const completion = await openai.chat.completions.create({
+        model: "gpt-4o-2024-05-13",
+        messages: [
+        {
+            role: "system",
+            content: "You are a helpful assistant. Use the product info to answer questions. Respond clearly in 3 sentences or fewer, highlighting only the core information.",
+        },
+        {
+            role: "user",
+            content: `Product title: ${title}\nProduct price: ${price}\nProduct description: ${description}\nUser question: ${question}`,
+        },
+        ],
+        temperature: 0.7,
+        max_tokens: 300,
+    });
+
+    const answer = completion.choices[0]?.message?.content?.trim();
+    res.json({ answer });
 }
