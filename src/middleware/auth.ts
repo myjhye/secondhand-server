@@ -27,7 +27,7 @@ declare global {
 }
 
 
-// JWT 확인
+// JWT 확인(지금 요청한 사람이 로그인한 사람인지 확인)
 export const isAuth: RequestHandler = async (req, res, next) => {
 
     try {

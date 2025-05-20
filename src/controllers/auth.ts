@@ -150,7 +150,7 @@ export const signIn: RequestHandler = async (req, res) => {
   };
 
   const accessToken = jwt.sign(payload, JWT_SECRET, {
-    expiresIn: "5s",
+    expiresIn: "15m",
   });
   const refreshToken = jwt.sign(payload, JWT_SECRET);
 
